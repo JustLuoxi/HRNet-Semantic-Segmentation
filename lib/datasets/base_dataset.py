@@ -64,9 +64,9 @@ class BaseDataset(data.Dataset):
         image = self.pad_image(image, h, w, self.crop_size,
                                 (0.0, 0.0, 0.0))
         label = self.pad_image(label, h, w, self.crop_size,
-                                (self.ignore_label,))
+                                (0.0, 0.0, 0.0))
         
-        new_h, new_w = label.shape
+        new_h, new_w = image.shape[:2]
         x = random.randint(0, new_w - self.crop_size[1])
         y = random.randint(0, new_h - self.crop_size[0])
         image = image[y:y+self.crop_size[0], x:x+self.crop_size[1]]

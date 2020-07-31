@@ -443,6 +443,7 @@ class HighResolutionNet(nn.Module):
 
         # Upsampling
         x0_h, x0_w = x[0].size(2), x[0].size(3)
+        # x0_h, x0_w = 600, 800
         x1 = F.upsample(x[1], size=(x0_h, x0_w), mode='bilinear')
         x2 = F.upsample(x[2], size=(x0_h, x0_w), mode='bilinear')
         x3 = F.upsample(x[3], size=(x0_h, x0_w), mode='bilinear')

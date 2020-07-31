@@ -29,8 +29,8 @@ import models
 import datasets
 from config import config
 from config import update_config
-from core.criterion import CrossEntropy, OhemCrossEntropy
-from core.function import train, validate
+from core.criterion import CrossEntropy, OhemCrossEntropy, Perceptual_loss
+from core.function import train, validate, train_lx, validate_lx
 from utils.modelsummary import get_model_summary
 from utils.utils import create_logger, FullModel, get_rank
 
@@ -184,7 +184,10 @@ def main():
         sampler=test_sampler)
 
     # criterion
-    if config.LOSS.USE_OHEM:
+    if config.DATASET.DATASET == 'lx':
+        criterion = Perceptual_loss()
+
+    elif config.LOSS.USE_OHEM:
         criterion = OhemCrossEntropy(ignore_label=config.TRAIN.IGNORE_LABEL,
                                      thres=config.LOSS.OHEMTHRES,
                                      min_kept=config.LOSS.OHEMKEEP,
@@ -217,6 +220,7 @@ def main():
                         config.TRAIN.BATCH_SIZE_PER_GPU / len(gpus))
     best_mIoU = 0
     last_epoch = 0
+    best_result = 1e6
     if config.TRAIN.RESUME:
         model_state_file = os.path.join(final_output_dir,
                                         'checkpoint.pth.tar')
@@ -238,48 +242,93 @@ def main():
     for epoch in range(last_epoch, end_epoch):
         if distributed:
             train_sampler.set_epoch(epoch)
-        if epoch >= config.TRAIN.END_EPOCH:
-            train(config, epoch-config.TRAIN.END_EPOCH, 
-                  config.TRAIN.EXTRA_EPOCH, epoch_iters, 
-                  config.TRAIN.EXTRA_LR, extra_iters, 
-                  extra_trainloader, optimizer, model, 
-                  writer_dict, device)
+        # -------------------------------------------------------------------------------
+        if config.DATASET.DATASET == 'lx':
+            if epoch >= config.TRAIN.END_EPOCH:
+                train_lx(config, epoch-config.TRAIN.END_EPOCH,
+                      config.TRAIN.EXTRA_EPOCH, epoch_iters,
+                      config.TRAIN.EXTRA_LR, extra_iters,
+                      extra_trainloader, optimizer, model,
+                      writer_dict, device)
+            else:
+                train_lx(config, epoch, config.TRAIN.END_EPOCH,
+                      epoch_iters, config.TRAIN.LR, num_iters,
+                      trainloader, optimizer, model, writer_dict,
+                      device)
+
+            valid_loss = validate_lx(config,
+                        testloader, model, writer_dict, device)
+            if args.local_rank == 0:
+                logger.info('=> saving checkpoint to {}'.format(
+                    final_output_dir + 'checkpoint.pth.tar'))
+                torch.save({
+                    'epoch': epoch+1,
+                    'valid_loss': valid_loss,
+                    'state_dict': model.module.state_dict(),
+                    'optimizer': optimizer.state_dict(),
+                }, os.path.join(final_output_dir,'checkpoint.pth.tar'))
+
+                if best_result > valid_loss:
+                    best_result = valid_loss
+                    torch.save(model.module.state_dict(),
+                               os.path.join(final_output_dir, 'best.pth'))
+                msg = 'Loss: {:.3f}, best_result: {: 4.4f}'.format(
+                        valid_loss, best_result)
+                logging.info(msg)
+
+                if epoch == end_epoch - 1:
+                    torch.save(model.module.state_dict(),
+                           os.path.join(final_output_dir, 'final_state.pth'))
+
+                    writer_dict['writer'].close()
+                    end = timeit.default_timer()
+                    logger.info('Hours: %d' % np.int((end-start)/3600))
+                    logger.info('Done')
+
+        # -------------------------------------------------------------------------------
         else:
-            train(config, epoch, config.TRAIN.END_EPOCH, 
-                  epoch_iters, config.TRAIN.LR, num_iters,
-                  trainloader, optimizer, model, writer_dict,
-                  device)
+            if epoch >= config.TRAIN.END_EPOCH:
+                train(config, epoch-config.TRAIN.END_EPOCH,
+                      config.TRAIN.EXTRA_EPOCH, epoch_iters,
+                      config.TRAIN.EXTRA_LR, extra_iters,
+                      extra_trainloader, optimizer, model,
+                      writer_dict, device)
+            else:
+                train(config, epoch, config.TRAIN.END_EPOCH,
+                      epoch_iters, config.TRAIN.LR, num_iters,
+                      trainloader, optimizer, model, writer_dict,
+                      device)
 
-        valid_loss, mean_IoU, IoU_array = validate(config, 
-                    testloader, model, writer_dict, device)
+            valid_loss, mean_IoU, IoU_array = validate(config,
+                        testloader, model, writer_dict, device)
 
-        if args.local_rank == 0:
-            logger.info('=> saving checkpoint to {}'.format(
-                final_output_dir + 'checkpoint.pth.tar'))
-            torch.save({
-                'epoch': epoch+1,
-                'best_mIoU': best_mIoU,
-                'state_dict': model.module.state_dict(),
-                'optimizer': optimizer.state_dict(),
-            }, os.path.join(final_output_dir,'checkpoint.pth.tar'))
+            if args.local_rank == 0:
+                logger.info('=> saving checkpoint to {}'.format(
+                    final_output_dir + 'checkpoint.pth.tar'))
+                torch.save({
+                    'epoch': epoch+1,
+                    'best_mIoU': best_mIoU,
+                    'state_dict': model.module.state_dict(),
+                    'optimizer': optimizer.state_dict(),
+                }, os.path.join(final_output_dir,'checkpoint.pth.tar'))
 
-            if mean_IoU > best_mIoU:
-                best_mIoU = mean_IoU
-                torch.save(model.module.state_dict(),
-                           os.path.join(final_output_dir, 'best.pth'))
-            msg = 'Loss: {:.3f}, MeanIU: {: 4.4f}, Best_mIoU: {: 4.4f}'.format(
-                    valid_loss, mean_IoU, best_mIoU)
-            logging.info(msg)
-            logging.info(IoU_array)
+                if mean_IoU > best_mIoU:
+                    best_mIoU = mean_IoU
+                    torch.save(model.module.state_dict(),
+                               os.path.join(final_output_dir, 'best.pth'))
+                msg = 'Loss: {:.3f}, MeanIU: {: 4.4f}, Best_mIoU: {: 4.4f}'.format(
+                        valid_loss, mean_IoU, best_mIoU)
+                logging.info(msg)
+                logging.info(IoU_array)
 
-            if epoch == end_epoch - 1:
-                torch.save(model.module.state_dict(),
-                       os.path.join(final_output_dir, 'final_state.pth'))
+                if epoch == end_epoch - 1:
+                    torch.save(model.module.state_dict(),
+                           os.path.join(final_output_dir, 'final_state.pth'))
 
-                writer_dict['writer'].close()
-                end = timeit.default_timer()
-                logger.info('Hours: %d' % np.int((end-start)/3600))
-                logger.info('Done')
+                    writer_dict['writer'].close()
+                    end = timeit.default_timer()
+                    logger.info('Hours: %d' % np.int((end-start)/3600))
+                    logger.info('Done')
 
 
 if __name__ == '__main__':

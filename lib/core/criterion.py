@@ -7,6 +7,11 @@
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
+import torch
+#import models_lpf
+import torch.nn.functional as F
+import torchvision.models.vgg as vgg
+from collections import namedtuple
 
 class CrossEntropy(nn.Module):
     def __init__(self, ignore_label=-1, weight=None):
@@ -56,3 +61,86 @@ class OhemCrossEntropy(nn.Module):
         pixel_losses = pixel_losses[mask][ind]
         pixel_losses = pixel_losses[pred < threshold] 
         return pixel_losses.mean()
+
+def gradient_1order(x,h_x=None,w_x=None):
+    if h_x is None and w_x is None:
+        h_x = x.size()[2]
+        w_x = x.size()[3]
+    r = F.pad(x, (0, 1, 0, 0))[:, :, :, 1:]
+    l = F.pad(x, (1, 0, 0, 0))[:, :, :, :w_x]
+    t = F.pad(x, (0, 0, 1, 0))[:, :, :h_x, :]
+    b = F.pad(x, (0, 0, 0, 1))[:, :, 1:, :]
+    horizontal = r-l
+    vertical = t-b
+    return (horizontal + vertical)
+
+LossOutput = namedtuple(
+    "LossOutput", ["relu1","relu2"])
+
+class LossNetwork(torch.nn.Module):
+    """Reference:
+        https://discuss.pytorch.org/t/how-to-extract-features-of-an-image-from-a-trained-model/119/3
+    """
+
+    def __init__(self):
+        super(LossNetwork, self).__init__()
+        self.vgg_layers = vgg.vgg19(pretrained=True).features
+
+        '''
+        self.layer_name_mapping = {
+            '3': "relu1",
+            '8': "relu2",
+            '17': "relu3",
+            '26': "relu4",
+            '35': "relu5",
+        }
+        '''
+
+
+
+        self.layer_name_mapping = {
+            '3': "relu1",
+            '8': "relu2"
+
+        }
+
+    def forward(self, x):
+        output = {}
+        for name, module in self.vgg_layers._modules.items():
+            x = module(x)
+            if name in self.layer_name_mapping:
+                output[self.layer_name_mapping[name]] = x
+            if name > '8':
+                break
+        return LossOutput(**output)
+
+
+class Perceptual_loss(torch.nn.Module):
+    def __init__(self):
+        super(Perceptual_loss, self).__init__()
+
+        # self.model = models_lpf.resnet50(filter_size = 5)
+        # self.model.load_state_dict(torch.load('/data/wmy/NR/models/resnet50_lpf5.pth.tar')['state_dict'])
+        self.model = LossNetwork()
+        self.model.cuda()
+        self.model.eval()
+        self.mse_loss = torch.nn.MSELoss(reduction='mean')
+        self.mask_loss = torch.nn.CrossEntropyLoss()
+        # if cfg.MODEL.LOSS == "L1":
+        #     self.loss = torch.nn.L1Loss(reduction='mean')
+        # else:
+        self.loss = torch.nn.MSELoss(reduction='mean')
+
+    # Minye
+    def forward(self, x, target):
+        ph, pw = x.size(2), x.size(3)
+        h, w = target.size(2), target.size(3)
+        if ph != h or pw != w:
+            x = F.upsample(input=x, size=(h, w), mode='bilinear')
+        x_feature = self.model(x[:,0:3,:,:])
+        target_feature = self.model(target[:,0:3,:,:])
+
+        feature_loss = self.loss(x_feature.relu1,target_feature.relu1)+self.loss(x_feature.relu2,target_feature.relu2)
+
+        return feature_loss
+

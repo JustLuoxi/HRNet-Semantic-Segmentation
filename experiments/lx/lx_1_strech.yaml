@@ -9,11 +9,11 @@ WORKERS: 4
 PRINT_FREQ: 100
 
 DATASET:
-  DATASET: cityscapes
+  DATASET: lx
   ROOT: '../data/'
-  TEST_SET: 'list/cityscapes/val.lst'
-  TRAIN_SET: 'list/cityscapes/train.lst'
-  NUM_CLASSES: 19
+  TEST_SET: 'list/lx/test.lst'
+  TRAIN_SET: 'list/lx/train.lst'
+  NUM_CLASSES: 3
 MODEL:
   NAME: seg_hrnet
   PRETRAINED: 'pretrained_models/hrnetv2_w48_imagenet_pretrained.pth'
@@ -73,13 +73,13 @@ LOSS:
   OHEMKEEP: 131072
 TRAIN:
   IMAGE_SIZE:
-  - 1024
-  - 512
-  BASE_SIZE: 2048
-  BATCH_SIZE_PER_GPU: 2
+  - 800
+  - 600
+  BASE_SIZE: 600
+  BATCH_SIZE_PER_GPU: 1
   SHUFFLE: true
   BEGIN_EPOCH: 0
-  END_EPOCH: 484
+  END_EPOCH: 100
   RESUME: true
   OPTIMIZER: sgd
   LR: 0.01
@@ -93,9 +93,9 @@ TRAIN:
   SCALE_FACTOR: 16
 TEST:
   IMAGE_SIZE:
-  - 2048
-  - 1024
-  BASE_SIZE: 2048
-  BATCH_SIZE_PER_GPU: 4
+  - 800
+  - 600
+  BASE_SIZE: 600
+  BATCH_SIZE_PER_GPU: 1
   FLIP_TEST: false
   MULTI_SCALE: false

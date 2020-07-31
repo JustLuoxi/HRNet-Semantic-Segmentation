@@ -35,6 +35,90 @@ def reduce_tensor(inp):
         dist.reduce(reduced_inp, dst=0)
     return reduced_inp
 
+def train_lx(config, epoch, num_epoch, epoch_iters, base_lr, num_iters,
+         trainloader, optimizer, model, writer_dict, device):
+    # Training
+    model.train()
+    batch_time = AverageMeter()
+    ave_loss = AverageMeter()
+    tic = time.time()
+    cur_iters = epoch * epoch_iters
+    writer = writer_dict['writer']
+    global_steps = writer_dict['train_global_steps']
+    rank = get_rank()
+    world_size = get_world_size()
+
+    for i_iter, batch in enumerate(trainloader):
+        images, labels, _, _ = batch
+        images = images.to(device)
+        labels = labels.to(device)
+
+        losses, pred = model(images, labels)
+
+        loss = losses.mean()
+        reduced_loss = reduce_tensor(loss)
+
+        model.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        # measure elapsed time
+        batch_time.update(time.time() - tic)
+        tic = time.time()
+
+        # update average loss
+        ave_loss.update(reduced_loss.item())
+
+        lr = adjust_learning_rate(optimizer,
+                                  base_lr,
+                                  num_iters,
+                                  i_iter + cur_iters)
+
+        if i_iter % config.PRINT_FREQ == 0 and rank == 0:
+            print_loss = ave_loss.average() / world_size
+            msg = 'Epoch: [{}/{}] Iter:[{}/{}], Time: {:.2f}, ' \
+                  'lr: {:.6f}, Loss: {:.6f}'.format(
+                epoch, num_epoch, i_iter, epoch_iters,
+                batch_time.average(), lr, print_loss)
+            logging.info(msg)
+
+            writer.add_scalar('train_loss', print_loss, global_steps)
+            writer.add_image('train_img', pred[0,:,:,:], global_steps)
+            writer.add_image('train_gt', labels[0,:,:,:], global_steps)
+            writer_dict['train_global_steps'] = global_steps + 1
+
+
+def validate_lx(config, testloader, model, writer_dict, device):
+    rank = get_rank()
+    world_size = get_world_size()
+    model.eval()
+    ave_loss = AverageMeter()
+
+    with torch.no_grad():
+        for _, batch in enumerate(testloader):
+            image, label, _ = batch
+            size = label.size()
+            image = image.to(device)
+            label = label.to(device)
+
+            losses, pred = model(image, label)
+            pred = F.upsample(input=pred, size=(
+                size[-2], size[-1]), mode='bilinear')
+            loss = losses.mean()
+            reduced_loss = reduce_tensor(loss)
+            ave_loss.update(reduced_loss.item())
+
+    print_loss = ave_loss.average() / world_size
+
+    if rank == 0:
+        writer = writer_dict['writer']
+        global_steps = writer_dict['valid_global_steps']
+        writer.add_scalar('valid_loss', print_loss, global_steps)
+        writer.add_image('train_img', pred[0,:,:,:], global_steps)
+        writer.add_image('train_gt', label[0,:,:,:], global_steps)
+        writer_dict['valid_global_steps'] = global_steps + 1
+    return print_loss
+
 def train(config, epoch, num_epoch, epoch_iters, base_lr, num_iters,
          trainloader, optimizer, model, writer_dict, device):
     
