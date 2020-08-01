@@ -62,22 +62,10 @@ class OhemCrossEntropy(nn.Module):
         pixel_losses = pixel_losses[pred < threshold] 
         return pixel_losses.mean()
 
-def gradient_1order(x,h_x=None,w_x=None):
-    if h_x is None and w_x is None:
-        h_x = x.size()[2]
-        w_x = x.size()[3]
-    r = F.pad(x, (0, 1, 0, 0))[:, :, :, 1:]
-    l = F.pad(x, (1, 0, 0, 0))[:, :, :, :w_x]
-    t = F.pad(x, (0, 0, 1, 0))[:, :, :h_x, :]
-    b = F.pad(x, (0, 0, 0, 1))[:, :, 1:, :]
-    horizontal = r-l
-    vertical = t-b
-    return (horizontal + vertical)
-
 LossOutput = namedtuple(
     "LossOutput", ["relu1","relu2"])
 
-class LossNetwork(torch.nn.Module):
+class LossNetwork(nn.Module):
     """Reference:
         https://discuss.pytorch.org/t/how-to-extract-features-of-an-image-from-a-trained-model/119/3
     """
@@ -115,32 +103,37 @@ class LossNetwork(torch.nn.Module):
         return LossOutput(**output)
 
 
-class Perceptual_loss(torch.nn.Module):
+class Perceptual_loss(nn.Module):
     def __init__(self):
         super(Perceptual_loss, self).__init__()
 
-        # self.model = models_lpf.resnet50(filter_size = 5)
-        # self.model.load_state_dict(torch.load('/data/wmy/NR/models/resnet50_lpf5.pth.tar')['state_dict'])
-        self.model = LossNetwork()
-        self.model.cuda()
-        self.model.eval()
+        # self.model = LossNetwork()
+        # self.model.cuda()
+        # self.model.eval()
         self.mse_loss = torch.nn.MSELoss(reduction='mean')
         self.mask_loss = torch.nn.CrossEntropyLoss()
-        # if cfg.MODEL.LOSS == "L1":
-        #     self.loss = torch.nn.L1Loss(reduction='mean')
-        # else:
-        self.loss = torch.nn.MSELoss(reduction='mean')
+        self.loss = torch.nn.L1Loss(reduction='mean')
+        # self.loss = torch.nn.MSELoss(reduction='mean')
 
-    # Minye
+    # # Minye
+    # def forward(self, x, target):
+    #     ph, pw = x.size(2), x.size(3)
+    #     h, w = target.size(2), target.size(3)
+    #     if ph != h or pw != w:
+    #         x = F.upsample(input=x, size=(h, w), mode='bilinear')
+    #     x_feature = self.model(x[:,0:3,:,:])
+    #     target_feature = self.model(target[:,0:3,:,:])
+    #
+    #     feature_loss = self.loss(x_feature.relu1,target_feature.relu1)+self.loss(x_feature.relu2,target_feature.relu2)
+    #
+    #     return feature_loss
+
+    # L1
     def forward(self, x, target):
         ph, pw = x.size(2), x.size(3)
         h, w = target.size(2), target.size(3)
         if ph != h or pw != w:
             x = F.upsample(input=x, size=(h, w), mode='bilinear')
-        x_feature = self.model(x[:,0:3,:,:])
-        target_feature = self.model(target[:,0:3,:,:])
 
-        feature_loss = self.loss(x_feature.relu1,target_feature.relu1)+self.loss(x_feature.relu2,target_feature.relu2)
-
-        return feature_loss
+        return self.loss(x, target)
 

@@ -158,7 +158,7 @@ class Lx(BaseDataset):
 
     def input_transform(self, image):
         image = image.astype(np.float32)[:, :, ::-1]
-        # image = image / 255.0
+        image = image / 255.0
         # image -= self.mean
         # image /= self.std
         return image

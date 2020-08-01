@@ -26,7 +26,7 @@ import models
 import datasets
 from config import config
 from config import update_config
-from core.function import testval, test
+from core.function import testval, test, test_lx
 from utils.modelsummary import get_model_summary
 from utils.utils import create_logger, FullModel
 
@@ -124,7 +124,7 @@ def main():
         logging.info(msg)
         logging.info(IoU_array)
     elif 'test' in config.DATASET.TEST_SET:
-        test(config, 
+        test_lx(config,
              test_dataset, 
              testloader, 
              model,

@@ -156,6 +156,35 @@ def main():
             drop_last=True,
             sampler=extra_train_sampler)
 
+    # valid data
+    crop_size = (config.TRAIN.IMAGE_SIZE[1], config.TRAIN.IMAGE_SIZE[0])
+    val_dataset = eval('datasets.'+config.DATASET.DATASET)(
+                        root=config.DATASET.ROOT,
+                        list_path=config.DATASET.VAL_SET,
+                        num_samples=None,
+                        num_classes=config.DATASET.NUM_CLASSES,
+                        multi_scale=config.TRAIN.MULTI_SCALE,
+                        flip=config.TRAIN.FLIP,
+                        ignore_label=config.TRAIN.IGNORE_LABEL,
+                        base_size=config.TRAIN.BASE_SIZE,
+                        crop_size=crop_size,
+                        downsample_rate=config.TRAIN.DOWNSAMPLERATE,
+                        scale_factor=config.TRAIN.SCALE_FACTOR)
+
+    if distributed:
+        val_sampler = DistributedSampler(val_dataset)
+    else:
+        val_sampler = None
+
+    valloader = torch.utils.data.DataLoader(
+        val_dataset,
+        batch_size=config.TRAIN.BATCH_SIZE_PER_GPU,
+        shuffle=config.TRAIN.SHUFFLE and val_sampler is None,
+        num_workers=config.WORKERS,
+        pin_memory=True,
+        drop_last=True,
+        sampler=val_sampler)
+
     test_size = (config.TEST.IMAGE_SIZE[1], config.TEST.IMAGE_SIZE[0])
     test_dataset = eval('datasets.'+config.DATASET.DATASET)(
                         root=config.DATASET.ROOT,
@@ -227,7 +256,8 @@ def main():
         if os.path.isfile(model_state_file):
             checkpoint = torch.load(model_state_file, 
                         map_location=lambda storage, loc: storage)
-            best_mIoU = checkpoint['best_mIoU']
+            if config.DATASET.DATASET != 'lx':
+                best_mIoU = checkpoint['best_mIoU']
             last_epoch = checkpoint['epoch']
             model.module.load_state_dict(checkpoint['state_dict'])
             optimizer.load_state_dict(checkpoint['optimizer'])
@@ -257,18 +287,20 @@ def main():
                       device)
 
             valid_loss = validate_lx(config,
-                        testloader, model, writer_dict, device)
+                        valloader, model, writer_dict, device)
             if args.local_rank == 0:
-                logger.info('=> saving checkpoint to {}'.format(
-                    final_output_dir + 'checkpoint.pth.tar'))
-                torch.save({
-                    'epoch': epoch+1,
-                    'valid_loss': valid_loss,
-                    'state_dict': model.module.state_dict(),
-                    'optimizer': optimizer.state_dict(),
-                }, os.path.join(final_output_dir,'checkpoint.pth.tar'))
+                # logger.info('=> saving checkpoint to {}'.format(
+                #     final_output_dir + 'checkpoint.pth.tar'))
+                # torch.save({
+                #     'epoch': epoch+1,
+                #     'valid_loss': valid_loss,
+                #     'state_dict': model.module.state_dict(),
+                #     'optimizer': optimizer.state_dict(),
+                # }, os.path.join(final_output_dir,'checkpoint.pth.tar'))
 
                 if best_result > valid_loss:
+                    logger.info('=> saving best model to {}'.format(
+                        final_output_dir + 'checkpoint.pth.tar'))
                     best_result = valid_loss
                     torch.save(model.module.state_dict(),
                                os.path.join(final_output_dir, 'best.pth'))

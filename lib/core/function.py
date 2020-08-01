@@ -96,7 +96,7 @@ def validate_lx(config, testloader, model, writer_dict, device):
 
     with torch.no_grad():
         for _, batch in enumerate(testloader):
-            image, label, _ = batch
+            image, label, _ , _ = batch
             size = label.size()
             image = image.to(device)
             label = label.to(device)
@@ -118,6 +118,31 @@ def validate_lx(config, testloader, model, writer_dict, device):
         writer.add_image('train_gt', label[0,:,:,:], global_steps)
         writer_dict['valid_global_steps'] = global_steps + 1
     return print_loss
+
+def test_lx(config, test_dataset, testloader, model,
+         sv_dir='', sv_pred=True):
+    model.eval()
+    with torch.no_grad():
+        for _, batch in enumerate(tqdm(testloader)):
+            image, size, name = batch
+            size = size[0]
+            pred = test_dataset.multi_scale_inference(
+                model,
+                image,
+                scales=config.TEST.SCALE_LIST,
+                flip=config.TEST.FLIP_TEST)
+
+            if pred.size()[-2] != size[0] or pred.size()[-1] != size[1]:
+                pred = F.upsample(pred, (size[-2], size[-1]),
+                                  mode='bilinear')
+
+            if sv_pred:
+                sv_path = os.path.join(sv_dir, 'test_results')
+                if not os.path.exists(sv_path):
+                    os.mkdir(sv_path)
+                test_dataset.save_pred(pred, sv_path, name)
+
+
 
 def train(config, epoch, num_epoch, epoch_iters, base_lr, num_iters,
          trainloader, optimizer, model, writer_dict, device):
@@ -159,16 +184,16 @@ def train(config, epoch, num_epoch, epoch_iters, base_lr, num_iters,
                                   num_iters,
                                   i_iter+cur_iters)
 
-        if i_iter % config.PRINT_FREQ == 0 and rank == 0:
-            print_loss = ave_loss.average() / world_size
-            msg = 'Epoch: [{}/{}] Iter:[{}/{}], Time: {:.2f}, ' \
-                  'lr: {:.6f}, Loss: {:.6f}' .format(
-                      epoch, num_epoch, i_iter, epoch_iters, 
-                      batch_time.average(), lr, print_loss)
-            logging.info(msg)
-            
-            writer.add_scalar('train_loss', print_loss, global_steps)
-            writer_dict['train_global_steps'] = global_steps + 1
+        # if i_iter % config.PRINT_FREQ == 0 and rank == 0:
+        print_loss = ave_loss.average() / world_size
+        msg = 'Epoch: [{}/{}] Iter:[{}/{}], Time: {:.2f}, ' \
+              'lr: {:.6f}, Loss: {:.6f}' .format(
+                  epoch, num_epoch, i_iter, epoch_iters,
+                  batch_time.average(), lr, print_loss)
+        logging.info(msg)
+
+        writer.add_scalar('train_loss', print_loss, global_steps)
+        writer_dict['train_global_steps'] = global_steps + 1
 
 def validate(config, testloader, model, writer_dict, device):
     
