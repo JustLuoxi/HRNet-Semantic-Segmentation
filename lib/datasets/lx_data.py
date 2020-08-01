@@ -106,7 +106,13 @@ class Lx(BaseDataset):
         name = item["name"]
         image = cv2.imread(item["img"],
                            cv2.IMREAD_COLOR)
+
+        # get the RoI
+        x, y, w, h = cv2.boundingRect(image[:,:,0])
+        image = image[y:y + h, x:x + w,:]
+
         size = image.shape
+        # cv2.imwrite('image.png', image)
 
         if 'test' in self.list_path:
             image = self.input_transform(image)
@@ -116,6 +122,11 @@ class Lx(BaseDataset):
 
         gt = cv2.imread(item["gt"],
                            cv2.IMREAD_COLOR)
+
+        # x, y, w, h = cv2.boundingRect(gt[:,:,0])
+        gt = gt[y:y + h, x:x + w,:]
+
+        # cv2.imwrite('test.png', gt)
 
         image, gt = self.gen_sample(image, gt,
                                        self.multi_scale, self.flip,

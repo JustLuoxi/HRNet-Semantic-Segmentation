@@ -1,11 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" autoUpload="Always" serverName="66-HRNet">
+  <component name="PublishConfigData" autoUpload="Always">
     <serverData>
-      <paths name="66-HRNet">
+      <paths name="66_HRNet">
         <serverdata>
           <mappings>
-            <mapping deploy="/data/new_disk/luoxi/HR/code" local="$PROJECT_DIR$" web="/" />
+            <mapping deploy="/data/new_disk/luoxi/HR/code" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="68_ENR">
+        <serverdata>
+          <mappings>
+            <mapping local="$PROJECT_DIR$" web="/" />
           </mappings>
         </serverdata>
       </paths>
@@ -37,24 +44,10 @@
           </mappings>
         </serverdata>
       </paths>
-      <paths name="root@10.15.89.66:20001 (3)">
-        <serverdata>
-          <mappings>
-            <mapping deploy="/data/new_disk/luoxi/HR/code" local="$PROJECT_DIR$" />
-          </mappings>
-        </serverdata>
-      </paths>
-      <paths name="root@10.15.89.68:30017">
-        <serverdata>
-          <mappings>
-            <mapping local="$PROJECT_DIR$" web="/" />
-          </mappings>
-        </serverdata>
-      </paths>
       <paths name="root@10.15.89.68:30017 (1)">
         <serverdata>
           <mappings>
-            <mapping local="$PROJECT_DIR$" web="/" />
+            <mapping deploy="/data/new_disk/luoxi/HR/code" local="$PROJECT_DIR$" web="/" />
           </mappings>
         </serverdata>
       </paths>
