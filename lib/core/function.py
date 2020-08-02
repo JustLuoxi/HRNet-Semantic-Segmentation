@@ -21,6 +21,7 @@ from utils.utils import AverageMeter
 from utils.utils import get_confusion_matrix
 from utils.utils import adjust_learning_rate
 from utils.utils import get_world_size, get_rank
+from PIL import Image
 
 def reduce_tensor(inp):
     """
@@ -140,7 +141,11 @@ def test_lx(config, test_dataset, testloader, model,
                 sv_path = os.path.join(sv_dir, 'test_results')
                 if not os.path.exists(sv_path):
                     os.mkdir(sv_path)
-                test_dataset.save_pred(pred, sv_path, name)
+
+                pred = pred.cpu().numpy().copy()
+                save_img = Image.fromarray(pred)
+                save_img.save(os.path.join(sv_path, name + '.png'))
+                # test_dataset.save_pred(pred, sv_path, name)
 
 
 

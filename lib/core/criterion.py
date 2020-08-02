@@ -104,36 +104,35 @@ class LossNetwork(nn.Module):
 
 
 class Perceptual_loss(nn.Module):
-    def __init__(self):
+    def __init__(self, args, device):
         super(Perceptual_loss, self).__init__()
 
-        # self.model = LossNetwork()
-        # self.model.cuda()
-        # self.model.eval()
+        self.model = LossNetwork()
+        self.model.cuda()
+        self.model.eval()
         self.mse_loss = torch.nn.MSELoss(reduction='mean')
         self.mask_loss = torch.nn.CrossEntropyLoss()
         self.loss = torch.nn.L1Loss(reduction='mean')
         # self.loss = torch.nn.MSELoss(reduction='mean')
 
-    # # Minye
-    # def forward(self, x, target):
-    #     ph, pw = x.size(2), x.size(3)
-    #     h, w = target.size(2), target.size(3)
-    #     if ph != h or pw != w:
-    #         x = F.upsample(input=x, size=(h, w), mode='bilinear')
-    #     x_feature = self.model(x[:,0:3,:,:])
-    #     target_feature = self.model(target[:,0:3,:,:])
-    #
-    #     feature_loss = self.loss(x_feature.relu1,target_feature.relu1)+self.loss(x_feature.relu2,target_feature.relu2)
-    #
-    #     return feature_loss
-
-    # L1
+    # Minye
     def forward(self, x, target):
         ph, pw = x.size(2), x.size(3)
         h, w = target.size(2), target.size(3)
         if ph != h or pw != w:
             x = F.upsample(input=x, size=(h, w), mode='bilinear')
+        x_feature = self.model(x)
+        target_feature = self.model(target)
 
-        return self.loss(x, target)
+        feature_loss = self.loss(x_feature.relu1,target_feature.relu1)+self.loss(x_feature.relu2,target_feature.relu2)
+
+        return feature_loss
+
+    # # L1
+    # def forward(self, x, target):
+    #     ph, pw = x.size(2), x.size(3)
+    #     h, w = target.size(2), target.size(3)
+    #     if ph != h or pw != w:
+    #         x = F.upsample(input=x, size=(h, w), mode='bilinear')
+        # return self.loss(x, target)
 

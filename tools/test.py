@@ -29,6 +29,10 @@ from config import update_config
 from core.function import testval, test, test_lx
 from utils.modelsummary import get_model_summary
 from utils.utils import create_logger, FullModel
+from PIL import Image
+
+# os.environ['CUDA_VISIBLE_DEVICES'] = "1,3"
+# torch.cuda.set_device(1)
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train segmentation network')
@@ -68,10 +72,10 @@ def main():
     dump_input = torch.rand(
         (1, 3, config.TRAIN.IMAGE_SIZE[1], config.TRAIN.IMAGE_SIZE[0])
     )
-    logger.info(get_model_summary(model.cuda(), dump_input.cuda()))
+    # logger.info(get_model_summary(model.cuda(), dump_input.cuda()))
 
     if config.TEST.MODEL_FILE:
-        model_state_file = config.TEST.MODEL_FILE
+        model_state_file = os.path.join(final_output_dir, config.TEST.MODEL_FILE)
     else:
         model_state_file = os.path.join(final_output_dir,
                                         'final_state.pth')

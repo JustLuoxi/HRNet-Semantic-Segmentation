@@ -29,10 +29,11 @@ import models
 import datasets
 from config import config
 from config import update_config
-from core.criterion import CrossEntropy, OhemCrossEntropy, Perceptual_loss
+from core.criterion import CrossEntropy, OhemCrossEntropy, Perceptual_loss, LossNetwork
 from core.function import train, validate, train_lx, validate_lx
 from utils.modelsummary import get_model_summary
 from utils.utils import create_logger, FullModel, get_rank
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train segmentation network')
@@ -71,8 +72,10 @@ def main():
     cudnn.benchmark = config.CUDNN.BENCHMARK
     cudnn.deterministic = config.CUDNN.DETERMINISTIC
     cudnn.enabled = config.CUDNN.ENABLED
+    os.environ['CUDA_VISIBLE_DEVICES'] = str(config.GPUS).strip().strip('()')
     gpus = list(config.GPUS)
     distributed = len(gpus) > 1
+    # distributed = True
     device = torch.device('cuda:{}'.format(args.local_rank))
 
     # build model
@@ -84,7 +87,7 @@ def main():
         dump_input = torch.rand(
             (1, 3, config.TRAIN.IMAGE_SIZE[1], config.TRAIN.IMAGE_SIZE[0])
             )
-        logger.info(get_model_summary(model.to(device), dump_input.to(device)))
+        # logger.info(get_model_summary(model.to(device), dump_input.to(device)))
 
         # copy model file
         this_dir = os.path.dirname(__file__)
@@ -214,7 +217,7 @@ def main():
 
     # criterion
     if config.DATASET.DATASET == 'lx':
-        criterion = Perceptual_loss()
+        criterion = Perceptual_loss(args,device)
 
     elif config.LOSS.USE_OHEM:
         criterion = OhemCrossEntropy(ignore_label=config.TRAIN.IGNORE_LABEL,
@@ -229,7 +232,7 @@ def main():
     model = nn.SyncBatchNorm.convert_sync_batchnorm(model)
     model = model.to(device)
     model = nn.parallel.DistributedDataParallel(
-        model, device_ids=[args.local_rank], output_device=args.local_rank)
+        model, device_ids=[args.local_rank], output_device=args.local_rank,find_unused_parameters=True)
 
     # optimizer
     if config.TRAIN.OPTIMIZER == 'sgd':
@@ -289,14 +292,15 @@ def main():
             valid_loss = validate_lx(config,
                         valloader, model, writer_dict, device)
             if args.local_rank == 0:
-                # logger.info('=> saving checkpoint to {}'.format(
-                #     final_output_dir + 'checkpoint.pth.tar'))
-                # torch.save({
-                #     'epoch': epoch+1,
-                #     'valid_loss': valid_loss,
-                #     'state_dict': model.module.state_dict(),
-                #     'optimizer': optimizer.state_dict(),
-                # }, os.path.join(final_output_dir,'checkpoint.pth.tar'))
+                if epoch%10 == 0 and epoch!=0:
+                    logger.info('=> saving checkpoint to {}'.format(
+                        final_output_dir + 'checkpoint.pth.tar'))
+                    torch.save({
+                        'epoch': epoch+1,
+                        'valid_loss': valid_loss,
+                        'state_dict': model.module.state_dict(),
+                        'optimizer': optimizer.state_dict(),
+                    }, os.path.join(final_output_dir,'checkpoint.pth.tar'))
 
                 if best_result > valid_loss:
                     logger.info('=> saving best model to {}'.format(
