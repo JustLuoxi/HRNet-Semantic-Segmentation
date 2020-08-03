@@ -22,6 +22,7 @@ from utils.utils import get_confusion_matrix
 from utils.utils import adjust_learning_rate
 from utils.utils import get_world_size, get_rank
 from PIL import Image
+import cv2
 
 def reduce_tensor(inp):
     """
@@ -86,6 +87,7 @@ def train_lx(config, epoch, num_epoch, epoch_iters, base_lr, num_iters,
             writer.add_scalar('train_loss', print_loss, global_steps)
             writer.add_image('train_img', pred[0,:,:,:], global_steps)
             writer.add_image('train_gt', labels[0,:,:,:], global_steps)
+            writer.add_image('input', images[0,:,:,:], global_steps)
             writer_dict['train_global_steps'] = global_steps + 1
 
 
@@ -124,6 +126,7 @@ def test_lx(config, test_dataset, testloader, model,
          sv_dir='', sv_pred=True):
     model.eval()
     with torch.no_grad():
+        i = 0
         for _, batch in enumerate(tqdm(testloader)):
             image, size, name = batch
             size = size[0]
@@ -133,21 +136,31 @@ def test_lx(config, test_dataset, testloader, model,
                 scales=config.TEST.SCALE_LIST,
                 flip=config.TEST.FLIP_TEST)
 
-            if pred.size()[-2] != size[0] or pred.size()[-1] != size[1]:
-                pred = F.upsample(pred, (size[-2], size[-1]),
-                                  mode='bilinear')
-
+            print('test pred size: ')
+            print(pred.size())
+            pred_t = pred.detach().cpu()[0]
+            pred_t = cv2.cvtColor(pred_t.permute(1, 2, 0).numpy() * 255.0, cv2.COLOR_BGR2RGB)
+            # cv2.imwrite('pred_t.jpg', pred_t)
             if sv_pred:
-                sv_path = os.path.join(sv_dir, 'test_results')
+                # sv_path = os.path.join(sv_dir, 'test_results')
+                sv_path = 'out_results'
                 if not os.path.exists(sv_path):
                     os.mkdir(sv_path)
+            cv2.imwrite(sv_path + '/' + str(i).zfill(4) + '.jpg', pred_t)
+            i = i+1
 
-                pred = pred.cpu().numpy().copy()
-                save_img = Image.fromarray(pred)
-                save_img.save(os.path.join(sv_path, name + '.png'))
-                # test_dataset.save_pred(pred, sv_path, name)
+            # if pred.size()[-2] != size[0] or pred.size()[-1] != size[1]:
+            #     pred = F.upsample(pred, (size[-2], size[-1]),
+            #                       mode='bilinear')
 
-
+            # if sv_pred:
+            #     sv_path = os.path.join(sv_dir, 'test_results')
+            #     if not os.path.exists(sv_path):
+            #         os.mkdir(sv_path)
+            #
+            #     pred_t = pred.detach().cpu()[0]
+            #     pred_t = cv2.cvtColor(pred_t.permute(1, 2, 0).numpy() * 255.0, cv2.COLOR_BGR2RGB)
+            #     cv2.imwrite(str(sv_path) +'/'+ name + '.jpg', pred_t)
 
 def train(config, epoch, num_epoch, epoch_iters, base_lr, num_iters,
          trainloader, optimizer, model, writer_dict, device):

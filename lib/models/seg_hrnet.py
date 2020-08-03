@@ -262,10 +262,10 @@ class HighResolutionNet(nn.Module):
         super(HighResolutionNet, self).__init__()
 
         # stem net
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=2, padding=1,
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1,
                                bias=False)
         self.bn1 = BatchNorm2d(64, momentum=BN_MOMENTUM)
-        self.conv2 = nn.Conv2d(64, 64, kernel_size=3, stride=2, padding=1,
+        self.conv2 = nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1,
                                bias=False)
         self.bn2 = BatchNorm2d(64, momentum=BN_MOMENTUM)
         self.relu = nn.ReLU(inplace=True)
@@ -409,13 +409,21 @@ class HighResolutionNet(nn.Module):
         return nn.Sequential(*modules), num_inchannels
 
     def forward(self, x):
+        # print(x.size())
         x = self.conv1(x)
+        # print(x.size())
         x = self.bn1(x)
+        # print(x.size())
         x = self.relu(x)
+        # print(x.size())
         x = self.conv2(x)
+        # print(x.size())
         x = self.bn2(x)
+        # print(x.size())
         x = self.relu(x)
+        # print(x.size())
         x = self.layer1(x)
+        # print(x.size())
 
         x_list = []
         for i in range(self.stage2_cfg['NUM_BRANCHES']):
@@ -440,6 +448,7 @@ class HighResolutionNet(nn.Module):
             else:
                 x_list.append(y_list[i])
         x = self.stage4(x_list)
+        # print(x[0].size())
 
         # Upsampling
         x0_h, x0_w = x[0].size(2), x[0].size(3)

@@ -151,7 +151,8 @@ class BaseDataset(data.Dataset):
         pred = model(image)
         pred = F.upsample(input=pred, 
                             size=(size[-2], size[-1]), 
-                            mode='bilinear')        
+                            mode='bilinear')
+        # print(pred.size())
         if flip:
             flip_img = image.numpy()[:,:,:,::-1]
             flip_output = model(torch.from_numpy(flip_img.copy()))

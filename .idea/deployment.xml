@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" autoUpload="Always" serverName="root@10.15.89.66:20021">
+  <component name="PublishConfigData" autoUpload="Always" serverName="68_GAN_HRNet">
     <serverData>
       <paths name="66_HRNet">
         <serverdata>
@@ -13,6 +13,13 @@
         <serverdata>
           <mappings>
             <mapping local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="68_GAN_HRNet">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/data/new_disk/luoxi/HR/code-GAN" local="$PROJECT_DIR$" />
           </mappings>
         </serverdata>
       </paths>
@@ -45,6 +52,13 @@
         </serverdata>
       </paths>
       <paths name="root@10.15.89.66:20021">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/data/new_disk/luoxi/HR/code" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="root@10.15.89.66:20021 (1)">
         <serverdata>
           <mappings>
             <mapping deploy="/data/new_disk/luoxi/HR/code" local="$PROJECT_DIR$" />

@@ -133,6 +133,7 @@ class Lx(BaseDataset):
                    multi_scale=True, is_flip=True, center_crop_test=False):
         if multi_scale:
             rand_scale = 0.5 + random.randint(0, self.scale_factor) / 10.0
+            # rand_scale = 1
             image, gt = self.multi_scale_aug(image, gt,
                                                 rand_scale=rand_scale)
 
@@ -192,6 +193,9 @@ class Lx(BaseDataset):
         batch, _, ori_height, ori_width = image.size()
         assert batch == 1, "only supporting batchsize 1."
         image = image.numpy()[0].transpose((1, 2, 0)).copy()
+        cv2.imwrite('image.jpg',image)
+        print('image load size:')
+        print(image.shape)
         stride_h = np.int(self.crop_size[0] * 1.0)
         stride_w = np.int(self.crop_size[1] * 1.0)
         final_pred = torch.zeros([1, self.num_classes,
@@ -235,10 +239,13 @@ class Lx(BaseDataset):
                         count[:, :, h0:h1, w0:w1] += 1
                 preds = preds / count
                 preds = preds[:, :, :height, :width]
+            print(preds.size())
             preds = F.upsample(preds, (ori_height, ori_width),
                                mode='bilinear')
             final_pred += preds
-        return final_pred
+            print('final_pred size: ' )
+            print(final_pred.size())
+        return final_pred/len(scales)
 
     def get_palette(self, n):
         palette = [0] * (n * 3)
@@ -255,6 +262,25 @@ class Lx(BaseDataset):
                 i += 1
                 lab >>= 3
         return palette
+
+    def inference(self, model, image, flip=False):
+        size = image.size()
+        pred = model(image)
+        pred = F.upsample(input=pred,
+                            size=(size[-2], size[-1]),
+                            mode='bilinear')
+        # print(pred.size())
+        if flip:
+            flip_img = image.numpy()[:,:,:,::-1]
+            flip_output = model(torch.from_numpy(flip_img.copy()))
+            flip_output = F.upsample(input=flip_output,
+                            size=(size[-2], size[-1]),
+                            mode='bilinear')
+            flip_pred = flip_output.cpu().numpy().copy()
+            flip_pred = torch.from_numpy(flip_pred[:,:,:,::-1].copy()).cuda()
+            pred += flip_pred
+            pred = pred * 0.5
+        return pred
 
     def save_pred(self, preds, sv_path, name):
         palette = self.get_palette(256)

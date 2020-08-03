@@ -91,7 +91,12 @@ def main():
     model_dict.update(pretrained_dict)
     model.load_state_dict(model_dict)
 
+    os.environ['CUDA_VISIBLE_DEVICES'] = str(config.GPUS).strip().strip('()')
     gpus = list(config.GPUS)
+    num = len(gpus)
+    gpus.clear()
+    for i in range(num):
+        gpus.append(i)
     model = nn.DataParallel(model, device_ids=gpus).cuda()
 
     # prepare data
